@@ -69,13 +69,21 @@ const sri2dbConfig = {
     api: {
         baseUrl: 'https://api.my.org',
         path: '/persons', //could also be /persons?gender=FEMALE if you only want to sync part of a list
+        limit: 2500,
+        //nextLinksBroken: true, //false by default but workaround with limit & offset if for some reason they don't work reliably
+        //deletedNotImplemented: true //false by default but skips sync of deleted for deltaSync (only needed for broken sri API's)
+
+        // cfr. https://github.com/katholiek-onderwijs-vlaanderen/sri-client#generic-interface
+        // for other options to control how the api is accessed
         username: 'userthatcanreadallresources', // can be omitted if API is public
         password: 'secret',                      // can be omitted if API is public
         //headers: {}, //configure extra http headers if necessary
         timeout: 30000,
-        limit: 2500,
-        //nextLinksBroken: true, //false by default but workaround with limit & offset if for some reason they don't work reliably
-        //deletedNotImplemented: true //false by default but skips sync of deleted for deltaSync (only needed for broken sri API's)
+        retry: {
+            retries: 1,
+            initialWait: 2000,
+            // factor: 3,
+        },
     },
     db: {
         type: 'pg', // mssql also supported
@@ -237,7 +245,7 @@ being made is that the clock speed of the client machine and the API will not be
     CREATE TABLE sri2db_table (href varchar, jsondata jsonb, modified timestamptz, key varchar, resourcetype varchar, path varchar, baseurl varchar);
 
     /* at the very least, create an unique index on href, but if you have path and baseurl in the table the index should contain these fields too */
-    CREATE UNIQUE INDEX sri2db_table_baseurl_path_href_idx ON table (baseurl, path, href);
+    CREATE UNIQUE INDEX sri2db_table_baseurl_path_href_idx ON sri2db_table (baseurl, path, href);
     -- or if no baseurl colomn
     CREATE UNIQUE INDEX sri2db_table_path_href_idx ON sri2db_table (path, href);
     -- or if no baseurl and no path column
@@ -262,7 +270,7 @@ being made is that the clock speed of the client machine and the API will not be
 	CREATE TABLE sri2db_table (href varchar(1024) NOT NULL, jsondata nvarchar(MAX), modified datetime NOT NULL, [key] varchar(100) NOT NULL, /*resourcetype varchar(100) NOT NULL,*/ path varchar(1024) NOT NULL, baseurl varchar(1024) NOT NULL);
 
     /* at the very least, create an unique index on href, but if you have path and baseurl in the table the index should contain these fields too */
-    CREATE UNIQUE INDEX sri2db_table_baseurl_path_href_idx ON table (baseurl, path, href);
+    CREATE UNIQUE INDEX sri2db_table_baseurl_path_href_idx ON sri2db_table (baseurl, path, href);
     -- or if no baseurl colomn
     CREATE UNIQUE INDEX sri2db_table_path_href_idx ON sri2db_table (path, href);
     -- or if no baseurl and no path column

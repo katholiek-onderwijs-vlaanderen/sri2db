@@ -24,7 +24,6 @@ const {
 } = require('./utils');
 
 
-
 /**
  * It will add the proper input parameters to the request object, and return the '... IN (...)'
  * part of the query string (IN over multiple columns is not supported in MSSQL)
