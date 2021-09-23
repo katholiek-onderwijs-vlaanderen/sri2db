@@ -1407,7 +1407,7 @@ function Sri2DbFactory(configObject = {}) {
     let nextPath = url;
     let nextOffset = 0;
     const getListOptions = { ...options, raw: true };
-    let nextJsonDataPromise = api.getRaw(url, {}, getListOptions); // api.getList(url, {}, getListOptions);
+    let nextJsonDataPromise = api.wrapGet(url, {}, getListOptions); // api.getList(url, {}, getListOptions);
     let pageNum = 0;
     let count = 0;
     while (nextJsonDataPromise) {
@@ -1423,7 +1423,7 @@ function Sri2DbFactory(configObject = {}) {
         nextPath = null;
       }
       // already start fetching the next url
-      nextJsonDataPromise = nextPath ? api.getRaw(`${nextPath}`, {}, { ...options, raw: true }) : null;
+      nextJsonDataPromise = nextPath ? api.wrapGet(`${nextPath}`, {}, { ...options, raw: true }) : null;
 
       // apply async function to batch
       try {
