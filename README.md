@@ -28,7 +28,10 @@ The easiest way should be to install it globally:
 
 Then you need to create a myconfig.js file that exports a valid config object:
 ```
-module.exports = { ... }
+module.exports = { 
+  concurrency: 1, // how many sync jobs are allowed to run at the same time
+  baseConfig: { ... see blow for more details ... }
+}
 ```
 The config object should either be a config object for Sri2Db or for Sri2DbMulti as explained below. The cli tool is smart enough to figure out whether it's a configuration for a single API, or for multiple API's.
 
