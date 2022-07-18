@@ -1085,6 +1085,9 @@ const dbFactory = function dbFactory(configObject = {}) {
                   ${baseUrlColumnExists ? 'AND i.baseurl = w.baseurl' : ''}
                   ${pathColumnExists ? 'AND i.path = w.path' : ''}
                )
+               /* important to check w.baseUrl again, because otherwise we would delete everything (also from other api's) that's not in the temp table, instead of only the records for the running sync */
+               ${baseUrlColumnExists ? 'AND w.baseurl = @baseUrl' : ''}
+               ${pathColumnExists ? 'AND w.path = @path' : ''}
             `,
             [
               { name: 'baseUrl', value: config.baseUrl, type: mssql.VarChar },
