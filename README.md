@@ -272,19 +272,15 @@ being made is that the clock speed of the client machine and the API will not be
 
 	CREATE TABLE sri2db_table (href varchar(1024) NOT NULL, jsondata nvarchar(MAX), modified datetime NOT NULL, [key] varchar(100) NOT NULL, /*resourcetype varchar(100) NOT NULL,*/ path varchar(1024) NOT NULL, baseurl varchar(1024) NOT NULL);
 
-    /* at the very least, create an unique index on href, but if you have path and baseurl in the table the index should contain these fields too */
-    CREATE UNIQUE CLUSTERED INDEX sri2db_table_baseurl_path_href_idx ON sri2db_table (baseurl, path, href) with (data_compression = page);
+    /* create 2 unique indexes (1 of them clustered) on href, but if you have path and baseurl in the table the index should contain these fields too */
+    CREATE UNIQUE clustered INDEX sri2db_table_baseurl_path_href_cidx ON sri2db_table (href, path, baseurl) with (data_compression = page);
+    CREATE UNIQUE           INDEX sri2db_table_baseurl_path_href_idx ON sri2db_table (href, path, baseurl) with (data_compression = page);
     -- or if no baseurl colomn
-    CREATE UNIQUE CLUSTERED INDEX sri2db_table_path_href_idx ON sri2db_table (path, href) with (data_compression = page);
+    CREATE UNIQUE clustered INDEX sri2db_table_baseurl_path_href_cidx ON sri2db_table (href, path) with (data_compression = page);
+    CREATE UNIQUE           INDEX sri2db_table_baseurl_path_href_idx ON sri2db_table (href, path) with (data_compression = page);
     -- or if no baseurl and no path column
-    CREATE UNIQUE CLUSTERED INDEX sri2db_table_href_idx ON sri2db_table (href) with (data_compression = page);
-    
-    /* [DEPRECATED] and to quickly get the last sync date, a similar index on modified would also make sense */
-    CREATE INDEX sri2db_table_baseurl_path_modified_idx ON sri2db_table (baseurl, path, modified);
-    -- or if no baseurl colomn
-    CREATE INDEX sri2db_table_path_modified_idx ON sri2db_table (path, modified);
-    -- or if no baseurl and no path column
-    CREATE INDEX sri2db_table_modified_idx ON sri2db_table (modified);
+    CREATE UNIQUE clustered INDEX sri2db_table_baseurl_path_href_cidx ON sri2db_table (href) with (data_compression = page);
+    CREATE UNIQUE           INDEX sri2db_table_baseurl_path_href_idx ON sri2db_table (href) with (data_compression = page);
 
 
  * the 'key' column can also be uuid, but in case the key is not a uuid varchar would be a safer bet.
