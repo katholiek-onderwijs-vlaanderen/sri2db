@@ -5,19 +5,18 @@
   "main": "./src/lib/client.js",
   "bin": "./bin/sri2db.js",
   "scripts": {
-    "test": "mocha"
+    "pretest": "(./node_modules/kov-docker-utils/kov-docker-utils postgres cleanup 'sri2db_test_postgres' || echo 'No cleanup needed') && ./node_modules/kov-docker-utils/kov-docker-utils postgres start 'sri2db_test_postgres' 25432 ./docker/postgres_initdb",
+    "test": "./node_modules/mocha/bin/mocha.js; ./node_modules/kov-docker-utils/kov-docker-utils postgres stop 'sri2db_test_postgres'"
   },
   "devDependencies": {
     "chai": "~3.2.0",
-    "chai-as-promised": "5.1.x",
     "chai-datetime": "1.4.x",
     "eslint": "5.16.0",
     "eslint-config-airbnb-base": "13.1.0",
     "eslint-plugin-import": "2.17.3",
     "express": "^4.18.2",
-    "mocha": "6.1.4",
-    "moment": "^2.29.4",
-    "node-uuid": "~1.4.3"
+    "kov-docker-utils": "git+https://github.com/katholiek-onderwijs-vlaanderen/kov-docker-utils.git",
+    "mocha": "^10.2.0"
   },
   "dependencies": {
     "@kathondvla/sri-client": "git+https://github.com/katholiek-onderwijs-vlaanderen/sri-client.git#3.0.20",
@@ -28,7 +27,7 @@
     "p-all": "2.1.0",
     "p-settle": "3.1.0",
     "pg-promise": "8.7.5",
-    "socket.io-client": "2.2.0"
+    "socket.io-client": "^4.5.4"
   },
   "repository": {
     "type": "git",
@@ -46,7 +45,7 @@
     "url": "https://github.com/katholiek-onderwijs-vlaanderen/sri2db/issues"
   },
   "engines": {
-    "node": ">8.9.3",
-    "npm": ">5.5.1"
+    "node": ">12.16.0",
+    "npm": ">6.0.0"
   }
 }

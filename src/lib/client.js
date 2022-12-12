@@ -464,7 +464,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
    * Get connection from pool and open a transaction on it
    */
   async function openTransaction() {
-    const confAsString = `${config.type}|${config.host}|${config.database}|${config.username}|${hashCode(config.password)}|${config.idleTimeout}|${config.connectionTimeout}|${config.queryTimeout}`;
+    const confAsString = `${config.type}|${config.host}|${config.database}|${config.username}|${hashCode(config.password || '')}|${config.idleTimeout}|${config.connectionTimeout}|${config.queryTimeout}`;
 
     let poolOrConnection = null;
     if (mssql) {
@@ -1397,7 +1397,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
  *    path: string,
  *    nextLinksBroken?: boolean,
  *    username?: string,
- *    password: string,
+ *    password?: string,
  *    headers: Record<string,string>,
  *    [key: string]: unknown,
  *  },
@@ -1899,7 +1899,7 @@ function Sri2DbFactory(configObject) {
       syncDonePromise.settled = true;
       console.warn('[sync] Error while trying to sync', e, e.stack);
       // throw e;
-      throw new Error('[sync] Error while trying to sync', e);
+      throw new Error('[sync] Error while trying to sync');
     });
 
     return syncDonePromise;
