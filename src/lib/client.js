@@ -36,7 +36,7 @@ const {
  * @param type parameter type
  * @param {Array<string>} values an array of values
  *
- * @return the 'colmn IN ( @p1, @pé, ... )' part of the query
+ * @return the 'column IN ( @p1, @pé, ... )' part of the query
  */
 function mssqlParameterizeQueryForIn(request, columnName, parameterNamePrefix, type, values) {
   const parameterNames = values.map((v, i) => `${parameterNamePrefix}${i}`);
@@ -55,7 +55,7 @@ function mssqlParameterizeQueryForIn(request, columnName, parameterNamePrefix, t
  * @param {*} types parameter type
  * @param {Array<Array<string>>} tuples an array of arrays of values (all the tuples to be inserted)
  *
- * @return the 'colmn IN ( @p1, @pé, ... )' part of the query
+ * @return the 'column IN ( @p1, @pé, ... )' part of the query
  */
 function mssqlParameterizeQueryForInsertValues(request, columnNames, parameterNamePrefix, types, tuples) {
   const parameterNames = tuples.map(
