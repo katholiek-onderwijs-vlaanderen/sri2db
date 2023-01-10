@@ -1,6 +1,7 @@
 import express from 'express';
 import * as sri2db from '../src/lib/client.js';
 import pg from 'pg-promise';
+import mssql from 'mssql';
 import chai from 'chai';
 const { assert } = chai;
 
@@ -78,64 +79,156 @@ function fakeApiHandler(req, resp, _next) {
 
 // eslint-disable-next-line no-undef
 describe('sri2db test suite', () => {
+  const apiConfigBase = {
+    baseUrl: 'http://localhost:22222',
+    // path: '/a',
+    headers: {},
+    limit: 3,
+  };
+  const singleConfigPostgresBase = {
+    api: apiConfigBase,
+    db: {
+      type: 'postgres',
+      host: 'localhost',
+      port: 25432,
+      ssl: false,
+      database: 'postgres',
+      schema: 'public',
+      // table: 'sri2db_large',
+      username: 'postgres',
+      password: 'postgres',
+      connectionTimeout: 2000,
+    },
+    syncMethod: 'fullSync',
+  };
+
+  const singleConfigMssqlBase = {
+    api: apiConfigBase,
+    db: {
+      type: 'mssql',
+      host: 'localhost',
+      port: 21433,
+      database: 'db',
+      schema: 'dbo',
+      username: 'sa',
+      password: 'p@ssw0rd',
+      ssl: false,
+      // table: 'sri2db_large',
+      connectionTimeout: 2000,
+    },
+    syncMethod: 'fullSync',
+  };
+
   let fakeApiServer;
+  const pgp = pg({ schema: singleConfigPostgresBase.db.schema });
+  const postgresdb = pgp({ ...singleConfigPostgresBase.db, user: singleConfigPostgresBase.db.username });
+  const mssqlconfig = {
+    server: singleConfigMssqlBase.db.host,
+    database: singleConfigMssqlBase.db.database,
+    port: singleConfigMssqlBase.db.port || 1433,
+    user: singleConfigMssqlBase.db.username,
+    password: singleConfigMssqlBase.db.password,
+    pool: {
+      max: 2,
+      min: 0,
+      idleTimeoutMillis: singleConfigMssqlBase.db.idleTimeout || 2000,
+      connectionTimeout: singleConfigMssqlBase.db.connectionTimeout, // should not be in pool I guess?
+    },
+    connectionTimeout: singleConfigMssqlBase.db.connectionTimeout || 2000,
+    requestTimeout: singleConfigMssqlBase.db.queryTimeout || 2000,
+  };
+
+  let mssqldb;
+
+  // let connection;
 
   // eslint-disable-next-line no-undef
-  before(() => {
+  before(async () => {
     const fakeApi = express();
     fakeApi.use(fakeApiHandler);
     fakeApiServer = fakeApi.listen(22222);
+
+    // connection = await db.connect();
+    mssqldb = await mssql.connect(mssqlconfig);
   });
 
   // eslint-disable-next-line no-undef
   after(() => {
     console.log('closing the fake Api server');
     fakeApiServer.close();
-    // process.exit();
+
+    pgp.end();
+
+    mssqldb.close();
   });
-  
 
-  it('should work', async () => {
-    // TODO
-    // const response = await fetch('http://localhost:22222/a/1');
-    // const data = await response.json();
-    // console.log('received from api', data);
+  describe('POSTGRES', () => {
+    it('should work', async () => {
+      /** @typedef { import('../src/lib/client.js').TSri2DbConfig } TSri2DbConfig */
 
-    // const response2 = await fetch('http://localhost:22222/a?offset=0&limit=3');
-    // const data2 = await response2.json();
-    // console.log('received from api', data2);
+      /** @type {TSri2DbConfig} */
+      const singleConfig = {
+        ...singleConfigPostgresBase,
+        api: {
+          ...singleConfigPostgresBase.api,
+          path: '/a',
+        },
+        db: {
+          ...singleConfigPostgresBase.db,
+          table: 'sri2db_large',
+        },
+        syncMethod: 'fullSync',
+      };
 
-    /** @typedef { import('../src/lib/client.mjs').TSri2DbConfig } TSri2DbConfig */
+      const sri2DBInstance = sri2db.Sri2Db(singleConfig);
+      await sri2DBInstance.configuredSync();
 
-    /** @type {TSri2DbConfig} */
-    const singleConfig = {
-      api: {
-        baseUrl: 'http://localhost:22222',
-        path: '/a',
-        headers: {},
-        limit: 3,
-      },
-      db: {
-        type: 'postgres',
-        host: 'localhost',
-        port: '25432',
-        database: 'postgres',
-        schema: 'public',
-        table: 'sri2db_large',
-        username: 'postgres',
-        password: 'postgres',
-      },
-      syncMethod: 'fullSync',
-    };
+      assert.equal(
+        (await postgresdb.one('select count(*) from sri2db_synctimes')).count,
+        1,
+      );
 
-    const sri2DBInstance = sri2db.Sri2Db(singleConfig);
-    await sri2DBInstance.configuredSync();
+      // after the sync, we should check if the database contains whatever we think should be in the database
+      assert.equal(
+        (await postgresdb.one('select count(*) from sri2db_large')).count,
+        10,
+        'nr of resources did not match',
+      );
+    });
+  });
 
-    // after the sync, we should check if the database contains whatever we think should be in the database
-    const pgp = pg({ schema: singleConfig.db.schema });
-    const db = pgp({ ...singleConfig.db, user: singleConfig.db.username });
-    const connection = await db.connect();
-    const queryResult = await connection.result('select count(*) from sri2db_large');
-    assert.equal(queryResult.rows[0].count, 10, 'nr of resources did not match');
+  describe('MSSQL', () => {
+    it('should work', async () => {
+      /** @typedef { import('../src/lib/client.js').TSri2DbConfig } TSri2DbConfig */
+
+      /** @type {TSri2DbConfig} */
+      const singleConfig = {
+        ...singleConfigMssqlBase,
+        api: {
+          ...singleConfigMssqlBase.api,
+          path: '/a',
+        },
+        db: {
+          ...singleConfigMssqlBase.db,
+          table: 'sri2db_large',
+        },
+        syncMethod: 'fullSync',
+      };
+
+      const sri2DBInstance = sri2db.Sri2Db(singleConfig);
+      await sri2DBInstance.configuredSync();
+
+      assert.equal(
+        (await mssqldb.request().query('select count(*) as count from sri2db_synctimes')).recordset[0].count,
+        1,
+      );
+
+      // after the sync, we should check if the database contains whatever we think should be in the database
+      assert.equal(
+        (await (mssqldb.request().query('select count(*) as count from sri2db_large'))).recordset[0].count,
+        10,
+        'nr of resources did not match',
+      );
+    });
   });
 });

@@ -74,7 +74,7 @@ const dbs = {};
  * @typedef { {
  *    type: 'pg' | 'postgres' | 'postgresql'| 'mssql',
  *    host: string,
- *    port: string,
+ *    port: number,
  *    database: string, // name of the database
  *    schema: string,
  *    table: string,
@@ -425,7 +425,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
               CREATE TABLE [${config.schema}].[${lastSyncTimesTableName}] (
                 tablename varchar(1024) NOT NULL,
                 baseurl varchar(2048) NOT NULL,
-                path text NOT NULL,
+                path varchar(2048) NOT NULL,
                 synctype varchar(64) NOT NULL,
                 lastmodified bigint NOT NULL,
                 syncstart bigint
@@ -436,7 +436,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
           : `CREATE TABLE IF NOT EXISTS ${config.schema}.${lastSyncTimesTableName} (
               tablename varchar(1024) NOT NULL,
               baseurl varchar(2048) NOT NULL,
-              path text NOT NULL,
+              path varchar(2048) NOT NULL,
               synctype varchar(64) NOT NULL,
               lastmodified bigint NOT NULL,
               syncstart bigint
@@ -472,6 +472,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
         const mssqlconfig = {
           server: config.host,
           database: config.database,
+          port: config.port || 1433,
           user: config.username,
           password: config.password,
           pool: {

@@ -5,8 +5,8 @@
   "main": "./src/lib/client.js",
   "bin": "./bin/sri2db.js",
   "scripts": {
-    "pretest": "(./node_modules/kov-docker-utils/kov-docker-utils postgres cleanup 'sri2db_test_postgres' || echo 'No cleanup needed') && ./node_modules/kov-docker-utils/kov-docker-utils postgres start 'sri2db_test_postgres' 25432 ./docker/postgres_initdb",
-    "test": "./node_modules/mocha/bin/mocha.js; ./node_modules/kov-docker-utils/kov-docker-utils postgres stop 'sri2db_test_postgres'"
+    "pretest": "(./node_modules/kov-docker-utils/kov-docker-utils postgres cleanup 'sri2db_test_postgres' || echo 'No postgres cleanup needed') && (./node_modules/kov-docker-utils/kov-docker-utils mssql cleanup 'sri2db_test_mssql' || echo 'No mssql cleanup needed') && ./node_modules/kov-docker-utils/kov-docker-utils postgres start 'sri2db_test_postgres' 25432 ./docker/postgres_initdb && ./node_modules/kov-docker-utils/kov-docker-utils mssql start 'sri2db_test_mssql' 21433 ./docker/mssql_initdb",
+    "test": "./node_modules/mocha/bin/mocha.js; echo Mocha has finished; ./node_modules/kov-docker-utils/kov-docker-utils postgres stop 'sri2db_test_postgres' && ./node_modules/kov-docker-utils/kov-docker-utils mssql stop 'sri2db_test_mssql'"
   },
   "devDependencies": {
     "chai": "~3.2.0",
@@ -23,10 +23,10 @@
     "commander": "4.1.0",
     "json-merge-patch": "0.2.3",
     "lodash.clonedeep": "4.5.0",
-    "mssql": "5.1.0",
+    "mssql": "^5.1.5",
     "p-all": "2.1.0",
     "p-settle": "3.1.0",
-    "pg-promise": "8.7.5",
+    "pg-promise": "^10.15.4",
     "socket.io-client": "^4.5.4"
   },
   "repository": {
