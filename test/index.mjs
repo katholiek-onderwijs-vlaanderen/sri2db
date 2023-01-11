@@ -153,13 +153,17 @@ describe('sri2db test suite', () => {
   });
 
   // eslint-disable-next-line no-undef
-  after(() => {
+  after(async () => {
     console.log('closing the fake Api server');
     fakeApiServer.close();
 
-    pgp.end();
+    console.log('closing pg-promise');
+    await pgp.end();
 
-    mssql.close();
+    console.log('closing mssql');
+    await mssql.close();
+
+    console.log('All tests done');
   });
 
   describe('POSTGRES', () => {
