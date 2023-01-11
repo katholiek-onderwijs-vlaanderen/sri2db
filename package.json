@@ -6,7 +6,8 @@
   "bin": "./bin/sri2db.js",
   "scripts": {
     "pretest": "(./node_modules/kov-docker-utils/kov-docker-utils postgres cleanup 'sri2db_test_postgres' || echo 'No postgres cleanup needed') && (./node_modules/kov-docker-utils/kov-docker-utils mssql cleanup 'sri2db_test_mssql' || echo 'No mssql cleanup needed') && ./node_modules/kov-docker-utils/kov-docker-utils postgres start 'sri2db_test_postgres' 25432 ./docker/postgres_initdb && ./node_modules/kov-docker-utils/kov-docker-utils mssql start 'sri2db_test_mssql' 21433 ./docker/mssql_initdb",
-    "test": "./node_modules/mocha/bin/mocha.js; echo Mocha has finished; ./node_modules/kov-docker-utils/kov-docker-utils postgres stop 'sri2db_test_postgres' && ./node_modules/kov-docker-utils/kov-docker-utils mssql stop 'sri2db_test_mssql'"
+    "test": "./node_modules/mocha/bin/mocha.js; echo Mocha has finished; ./node_modules/kov-docker-utils/kov-docker-utils postgres stop 'sri2db_test_postgres' && ./node_modules/kov-docker-utils/kov-docker-utils mssql stop 'sri2db_test_mssql'",
+    "posttest": "(./node_modules/kov-docker-utils/kov-docker-utils postgres cleanup 'sri2db_test_postgres' || echo 'No postgres cleanup needed') && (./node_modules/kov-docker-utils/kov-docker-utils mssql cleanup 'sri2db_test_mssql' || echo 'No mssql cleanup needed')"
   },
   "devDependencies": {
     "chai": "~3.2.0",
@@ -19,7 +20,7 @@
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@kathondvla/sri-client": "git+https://github.com/katholiek-onderwijs-vlaanderen/sri-client.git#3.0.20",
+    "@kathondvla/sri-client": "git+https://github.com/katholiek-onderwijs-vlaanderen/sri-client.git#3.0.21",
     "commander": "4.1.0",
     "json-merge-patch": "0.2.3",
     "lodash.clonedeep": "4.5.0",

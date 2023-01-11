@@ -159,7 +159,7 @@ describe('sri2db test suite', () => {
 
     pgp.end();
 
-    mssqldb.close();
+    mssql.close();
   });
 
   describe('POSTGRES', () => {
