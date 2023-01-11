@@ -1,15 +1,23 @@
+/* eslint-disable max-len */
 /** **********************
  *   HELPER FUNCTIONS    *
  *********************** */
 
 const clonedeep = require('lodash.clonedeep');
 
-
+/**
+ * This function MODIFIES the object!!!
+ *
+ * @param {Record<string,unknown>} obj
+ * @returns {Record<string,unknown>}
+ */
 const removeDollarFields = (obj) => {
   Object.keys(obj).forEach((property) => {
-    if (property.startsWith('$$') && property != '$$meta') {
+    if (property.startsWith('$$') && property !== '$$meta') {
+      // eslint-disable-next-line no-param-reassign
       delete obj[property];
-    } else if (obj.property !== null && typeof obj.property === 'object') {
+    } else if (obj[property] !== null && typeof obj[property] === 'object') {
+      // @ts-ignore
       removeDollarFields(obj[property]);
     }
   });
@@ -47,7 +55,7 @@ function fixResourceForStoring(r) {
   if (r.$$meta && r.$$meta.modified && r.key) {
     return r;
   }
-  retVal = clonedeep(r);
+  const retVal = clonedeep(r);
   if (!(r.$$meta && r.$$meta.modified)) {
     retVal.$$meta.modified = new Date().toISOString();
   }
@@ -73,7 +81,7 @@ function setExpandOnPath(path, expansion) {
 }
 
 /**
- * @param {Number} nrOfMilliseconds
+ * @param {number} milliseconds
  * @param {String} unit can be ms, s, m, h, d
  */
 const msToOtherUnit = (milliseconds, unit) => {
@@ -92,14 +100,12 @@ const msToOtherUnit = (milliseconds, unit) => {
 /**
  * elapsedTimeCalculations calculates the elapsedMilliseconds given
  *
- * @param {Number} startDate obtained with a Date.now() call
- * @param {String} unit can be ms, s, m, h, d
- * @param {Number} amount [optional] if present will add avg per second/minute/hour
- * @param {String} avgUnit [optional] if not set, same unit as above, but you can make it avg per m, h, d, ... if you want
- * @param {Number} endDate [optional] obtained with a Date.now() call, if missing this function will do a Date.now() call for you
- */
-/**
- *
+ * @param {number} startDate obtained with a Date.now() call (nr of mssince Unix epoch)
+ * @param {'ms' | 's' | 'm' | 'h' | 'd'} unit can be ms, s, m, h, d
+ * @param {number | false} amount [optional] if present will add avg per second/minute/hour
+ * @param {string | false} avgUnit [optional] if not set, same unit as above, but you can make it avg per m, h, d, ... if you want
+ * @param {number} endDate [optional] obtained with a Date.now() call, if missing this function will do a Date.now() call for you
+ * @returns {{ unit: string, amount, avgUnit, startDate, endDate }}
  */
 const elapsedTimeCalculations = (startDate, unit = 'ms', amount = false, avgUnit = false, endDate = Date.now()) => {
   // eslint-disable-next-line no-param-reassign
@@ -121,10 +127,10 @@ const elapsedTimeCalculationsToString = (calc) => {
 
 /**
  *
- * @param {Date} startDate
- * @param {String} unit can be ms, s, m, h, d
- * @param {Number} amount [optional] if present will add avg per second/minute/hour
- * @param {String} avgUnit [optional] if not set, same unit as above, but you can make it avg per m, h, d, ... if you want
+ * @param {number} startDate
+ * @param {'ms' | 's' | 'm' | 'h' | 'd'} unit can be ms, s, m, h, d
+ * @param {number | false} amount [optional] if present will add avg per second/minute/hour
+ * @param {string | false} avgUnit [optional] if not set, same unit as above, but you can make it avg per m, h, d, ... if you want
  */
 const elapsedTimeString = (startDate, unit = 'ms', amount = false, avgUnit = false, endDate = Date.now()) => {
   const calc = elapsedTimeCalculations(startDate, unit, amount, avgUnit, endDate);
@@ -137,6 +143,9 @@ const elapsedTimeString = (startDate, unit = 'ms', amount = false, avgUnit = fal
  *
  * We also try to make it smart enough to handle an array that returns a plain array
  * (like security api query interface)
+ *
+ * @param {Array<unknown> | { results: Array<unknown>}} jsonData
+ * @returns {Array<Record<string,unknown> | string>}
  */
 const translateApiResponseToArrayOfResources = (jsonData) => {
   let results;
@@ -160,7 +169,12 @@ const translateApiResponseToArrayOfResources = (jsonData) => {
   return results;
 };
 
+async function sleep(timeout) {
+  return new Promise((resolve, reject) => setTimeout(() => resolve(true), timeout));
+}
+
 module.exports = {
+  sleep,
   removeDollarFields,
   hashCode,
   fixResourceForStoring,

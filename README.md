@@ -98,6 +98,9 @@ const sri2dbConfig = {
         username: 'dbusername',
         password: 'dbsecretpassword',
         ssl: true,
+        connectionTimeout: 60 * 1000, // default 1 minute (in milliseconds)
+        idleTimeout: 60 * 1000, // default 1 minute (in milliseconds)
+        queryTimeout: 60 * 60 * 1000,  // default 1 hour (in milliseconds)
         maxBulkSize: 20000, // [defaul = 10000] in case you get more records in one go from the API, they will be inserted in bulks of the given size (we experienced an out-of-mem on the database once, and we think this *might* help with huge bulk sizes)
         preferUpdatesOverInserts: false, // [default = false for postgres, true for mssql] (currently for full sync only) first delete all rows, and then insert them again, instead of only deleting rows that don't exist anymore, and updating the already existing rows afterwards
     },
@@ -224,7 +227,7 @@ You can call all the same functions as on a simple client: configuredSync (will 
 const results = await multiClient.configuredSync();
 ```
 
-and the resutls will have the following structure:
+and the results will have the following structure:
 ```
 [
     { isFulfilled: true, isRejected: false, value: 4 }, // if the promise resolved

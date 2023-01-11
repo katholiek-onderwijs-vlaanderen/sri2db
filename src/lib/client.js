@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+/* eslint-disable max-len */
 /**
 * Created by pablo in 2015
 * Modified by johannes in 2018-2019
@@ -30,11 +32,11 @@ const {
  *
  * @param request sql request object
  * @param {string} columnName sql table column name
- * @param {string} paramNamePrefix prefix for parameter name
+ * @param {string} parameterNamePrefix prefix for parameter name
  * @param type parameter type
  * @param {Array<string>} values an array of values
  *
- * @return the 'colmn IN ( @p1, @pé, ... )' part of the query
+ * @return the 'column IN ( @p1, @pé, ... )' part of the query
  */
 function mssqlParameterizeQueryForIn(request, columnName, parameterNamePrefix, type, values) {
   const parameterNames = values.map((v, i) => `${parameterNamePrefix}${i}`);
@@ -48,12 +50,12 @@ function mssqlParameterizeQueryForIn(request, columnName, parameterNamePrefix, t
  * 'VALUES (...),(...),...' part of the query string
  *
  * @param request sql request object
- * @param {string} columnName sql table column name
- * @param {string} paramNamePrefix prefix for parameter name
- * @param type parameter type
- * @param {Array<Array<string>>} values an array of arrays of values (all the tuples to be inserted)
+ * @param {Array<string>} columnNames sql table column name
+ * @param {string} parameterNamePrefix prefix for parameter name
+ * @param {*} types parameter type
+ * @param {Array<Array<string>>} tuples an array of arrays of values (all the tuples to be inserted)
  *
- * @return the 'colmn IN ( @p1, @pé, ... )' part of the query
+ * @return the 'column IN ( @p1, @pé, ... )' part of the query
  */
 function mssqlParameterizeQueryForInsertValues(request, columnNames, parameterNamePrefix, types, tuples) {
   const parameterNames = tuples.map(
@@ -67,33 +69,60 @@ function mssqlParameterizeQueryForInsertValues(request, columnNames, parameterNa
     .join(',')}`;
 }
 
+const dbs = {};
 /**
+ * @typedef { {
+ *    type: 'pg' | 'postgres' | 'postgresql'| 'mssql',
+ *    host: string,
+ *    port: number,
+ *    database: string, // name of the database
+ *    schema: string,
+ *    table: string,
+ *    username?: string,
+ *    password?: string,
+ *    ssl?: boolean, // default false
+ *    connectionTimeout?: number, // default 1 minute (in milliseconds)
+ *    idleTimeout?: number, // default 1 minute (in milliseconds)
+ *    queryTimeout?: number,  // default 1 hour (in milliseconds)
+ *    maxBulkSize?: number, // [default = 10000] in case you get more records in one go from the API, they will be inserted in bulks of the given size (we experienced an out-of-mem on the database once, and we think this *might* help with huge bulk sizes)
+ *    preferUpdatesOverInserts?: boolean, // [default = false for postgres, true for mssql] (currently for full sync only) first delete all rows, and then insert them again, instead of only deleting rows that don't exist anymore, and updating the already existing rows afterward
+ *    baseUrl?: string, // base url of synced api (like https://api.mycompany.com)
+ *    path?: string, // path of synced api (like /orders)
+ *    readTable?: string,
+ *    writeTable?: string,
+ * } } TDbConfigObject
+ *
  * A helper containing some methods to interact with the database.
  *
- * The helper should support multiple DBs like postgres and mssql.
+ *
+ * @param {TDbConfigObject} dbConfigObject
+ * @returns
  */
-const dbs = {};
-const dbFactory = function dbFactory(configObject = {}) {
+const dbFactory = function dbFactory(dbConfigObject) {
   // make a deep clone so the initialization object cannot be tampered with anymore afterwards
-  const config = clonedeep(configObject);
+  /** @type {TDbConfigObject} */
+  const config = {
+    // set some defaults first
+    ssl: false,
+    connectionTimeout: 60000,
+    idleTimeout: 60000,
+    queryTimeout: 60 * 60000,
+    maxBulkSize: 10000, // [default = 10000] in case you get more records in one go from the API, they will be inserted in bulks of the given size (we experienced an out-of-mem on the database once, and we think this *might* help with huge bulk sizes)
+    preferUpdatesOverInserts: dbConfigObject.type === 'mssql',
+    // We might support different read and write tables later, but for now
+    // if the user gives us a table, that's the one we'll use
+    readTable: dbConfigObject.table,
+    writeTable: dbConfigObject.table,
 
+    ...clonedeep(dbConfigObject),
+  };
+
+  // eslint-disable-next-line global-require
   const mssql = ['mssql'].includes(config.type.toLowerCase()) ? require('mssql') : null;
+  // eslint-disable-next-line global-require
   const pg = ['pg', 'postgres', 'postgresql'].includes(config.type.toLowerCase()) ? require('pg-promise')({ capSQL: true }) : null;
   if (!mssql && !pg) {
     throw new Error('Configuration problem, dbconfig.type must be either mssql or pg');
-  }
-
-  // We might support different read and write tables later, but for now
-  // if the user gives us a table, that's the one we'll use
-  if (!config.readTable && config.table) {
-    // eslint-disable-next-line no-param-reassign
-    config.writeTable = config.table;
-    // eslint-disable-next-line no-param-reassign
-    config.readTable = config.table;
-  }
-
-  if (!config.maxBulkSize) {
-    config.maxBulkSize = 10000;
   }
 
   const lastSyncTimesTableName = 'sri2db_synctimes';
@@ -103,7 +132,7 @@ const dbFactory = function dbFactory(configObject = {}) {
   const tempTableNameForSafeDeltaSync = `${mssql ? '##' : ''}sri2db_${tempTablePrefix}_safedeltasync`;
   const tempTableNameForSafeDeltaSyncInserts = `${mssql ? '##' : ''}sri2db_${tempTablePrefix}_safedeltasyncinserts`;
 
-  function log() { console.log(`[${tempTablePrefix}]`, ...arguments); }
+  function log(...args) { console.log(`[${tempTablePrefix}]`, ...args); }
 
   // first we need to know which columns exist in order to execute the right queries
   let initialized = false;
@@ -126,12 +155,12 @@ const dbFactory = function dbFactory(configObject = {}) {
   /**
    *
    * @param {*} transaction
-   * @param {*} query the query string containing '<at-symbol>paramName' parts for the named params
+   * @param {string} queryString the query string containing '<at-symbol>paramName' parts for the named params
    *  and in the case of postgres \${paramName} (prefixed with a backslash when used inside a
    *  JS template string)
-   * @param {*} params if mssql: an array of { name: '', type: mssql.VarChar, value: ... }
+   * @param {Array<{ name: string, type?:string, value:unknown }>} params if mssql: an array of { name: '', type: mssql.VarChar, value: ... }
    *   for postgres the type is not needed
-   * @param {bool} explain if true will run the query prepended with 'explain analyze' first,
+   * @param {boolean} explain if true will run the query prepended with 'explain analyze' first,
    *   and print the results
    */
   async function doQuery(transaction, queryString, params = [], explain = false) {
@@ -161,7 +190,7 @@ const dbFactory = function dbFactory(configObject = {}) {
     } if (pg) {
       try {
         const pgParams = {};
-        params.forEach(p => pgParams[p.name] = p.value);
+        params.forEach((p) => { pgParams[p.name] = p.value; });
 
         const result = await transaction.result(queryString, pgParams);
         return result.command === 'SELECT' ? result.rows : result;
@@ -170,6 +199,7 @@ const dbFactory = function dbFactory(configObject = {}) {
         throw e;
       }
     }
+    return -1;
   }
 
   /**
@@ -341,7 +371,7 @@ const dbFactory = function dbFactory(configObject = {}) {
             inner join sys.columns as col
                 on tab.object_id = col.object_id
             left join sys.types as t
-            on col.user_type_id = t.user_type_id
+                on col.user_type_id = t.user_type_id
         where schema_name(tab.schema_id) = @schemaName AND tab.name = @tableName
         order by schema_name,
             table_name,
@@ -395,7 +425,7 @@ const dbFactory = function dbFactory(configObject = {}) {
               CREATE TABLE [${config.schema}].[${lastSyncTimesTableName}] (
                 tablename varchar(1024) NOT NULL,
                 baseurl varchar(2048) NOT NULL,
-                path text NOT NULL,
+                path varchar(2048) NOT NULL,
                 synctype varchar(64) NOT NULL,
                 lastmodified bigint NOT NULL,
                 syncstart bigint
@@ -406,7 +436,7 @@ const dbFactory = function dbFactory(configObject = {}) {
           : `CREATE TABLE IF NOT EXISTS ${config.schema}.${lastSyncTimesTableName} (
               tablename varchar(1024) NOT NULL,
               baseurl varchar(2048) NOT NULL,
-              path text NOT NULL,
+              path varchar(2048) NOT NULL,
               synctype varchar(64) NOT NULL,
               lastmodified bigint NOT NULL,
               syncstart bigint
@@ -434,7 +464,7 @@ const dbFactory = function dbFactory(configObject = {}) {
    * Get connection from pool and open a transaction on it
    */
   async function openTransaction() {
-    const confAsString = `${config.type}|${config.host}|${config.database}|${config.username}|${hashCode(config.password)}`;
+    const confAsString = `${config.type}|${config.host}|${config.database}|${config.username}|${hashCode(config.password || '')}|${config.idleTimeout}|${config.connectionTimeout}|${config.queryTimeout}`;
 
     let poolOrConnection = null;
     if (mssql) {
@@ -442,15 +472,17 @@ const dbFactory = function dbFactory(configObject = {}) {
         const mssqlconfig = {
           server: config.host,
           database: config.database,
+          port: config.port || 1433,
           user: config.username,
           password: config.password,
           pool: {
             max: 10,
             min: 0,
-            idleTimeoutMillis: 60 * 60 * 1000, // 1 hour
-            connectionTimeout: 60 * 60 * 1000, // 1 hour
+            idleTimeoutMillis: config.idleTimeout,
+            connectionTimeout: config.connectionTimeout, // should not be in pool I guess?
           },
-          requestTimeout: 60 * 60 * 1000, // 1 hour
+          connectionTimeout: config.connectionTimeout,
+          requestTimeout: config.queryTimeout,
         };
 
         poolOrConnection = new mssql.ConnectionPool(mssqlconfig);
@@ -471,10 +503,10 @@ const dbFactory = function dbFactory(configObject = {}) {
           // pool: {
           max: 10,
           min: 0,
-          idleTimeoutMillis: 10 * 60 * 1000,
-          connectionTimeout: 10 * 60 * 60 * 1000, // 10 hours
-          connectionTimeoutMillis: 10 * 60 * 60 * 1000, // 10 hours
-          query_timeout: 10 * 60 * 60 * 1000, // 10 hours
+          idleTimeoutMillis: config.idleTimeout,
+          connectionTimeout: config.connectionTimeout,
+          connectionTimeoutMillis: config.connectionTimeout,
+          query_timeout: config.queryTimeout,
           keepAlive: true,
           // },
           capSQL: true, // capitalize all generated SQL
@@ -592,7 +624,12 @@ const dbFactory = function dbFactory(configObject = {}) {
               { name: 'path', type: mssql.VarChar, value: config.path },
               { name: 'syncType', type: mssql.VarChar, value: syncType },
             ]);
-          return result.length > 0 ? { lastModified: Number.parseInt(result[0].lastmodified), syncStart: Number.parseInt(result[0].syncstart) } : null;
+          return result.length > 0
+            ? {
+              lastModified: Number.parseInt(result[0].lastmodified, 10),
+              syncStart: Number.parseInt(result[0].syncstart, 10),
+            }
+            : null;
 
           // const result = await doQuery(myTransaction,
           //   `select [modified]
@@ -623,7 +660,12 @@ const dbFactory = function dbFactory(configObject = {}) {
               { name: 'path', value: config.path },
               { name: 'syncType', value: syncType },
             ]);
-          return result.length > 0 ? { lastModified: Number.parseInt(result[0].lastmodified), syncStart: result[0].syncstart } : null;
+          return result.length > 0
+            ? {
+              lastModified: Number.parseInt(result[0].lastmodified, 10),
+              syncStart: result[0].syncstart,
+            }
+            : null;
 
           // const result = await doQuery(myTransaction,
           //   `select modified
@@ -642,7 +684,7 @@ const dbFactory = function dbFactory(configObject = {}) {
         return null;
       } catch (e) {
         if (!transaction) db.rollbackTransaction(myTransaction);
-        throw new Error('Something went wrong while trying to query the DB', e);
+        throw new Error('Something went wrong while trying to query the DB');
       } finally {
         if (!transaction) await db.commitTransaction(myTransaction);
       }
@@ -652,7 +694,8 @@ const dbFactory = function dbFactory(configObject = {}) {
      * so it can be retrieved later with getLastSyncDate
      *
      * @param {String} syncType for example DELTA, FULL, SAFEDELTA
-     * @param {Date} lastSyncDate
+     * @param {Date} lastModified
+     * @param {Date} syncStart
      * @param {*} transaction (OPTIONAL)
      */
     setLastSyncTimestamps: async function setLastSyncTimestamps(syncType, lastModified, syncStart, transaction = null) {
@@ -702,7 +745,7 @@ const dbFactory = function dbFactory(configObject = {}) {
         return null;
       } catch (e) {
         if (!transaction) db.rollbackTransaction(myTransaction);
-        throw new Error('Something went wrong while trying to set last sync date on the DB', e);
+        throw new Error('Something went wrong while trying to set last sync date on the DB');
       } finally {
         if (!transaction) await db.commitTransaction(myTransaction);
       }
@@ -742,7 +785,7 @@ const dbFactory = function dbFactory(configObject = {}) {
         return retVal[0].exists;
       } catch (e) {
         console.log('[checkIfTableExists] FAILED', e, e.stack);
-        throw new Error('checkIfTableExists failed', e);
+        throw new Error('checkIfTableExists failed');
       }
     },
 
@@ -768,19 +811,19 @@ const dbFactory = function dbFactory(configObject = {}) {
           // const testResults = await (await transaction.request())
           //   .query(`SELECT OBJECT_ID(N'tempdb..${tempTableNameForUpdates}') as tableId`);
           // console.log('testResults', testResults.recordset[0]);
-          const beforeCreateUpdatesTable = new Date();
+          const beforeCreateUpdatesTable = Date.now();
           await doQuery(transaction, makeCreateTempTableString(tempTableNameForUpdates, false));
           console.log(`  Created temporary table for updated rows (${tempTableNameForUpdates}) in ${elapsedTimeString(beforeCreateUpdatesTable, 'ms')}\t${config.path}`);
 
-          const beforeCreateDeletesTable = new Date();
+          const beforeCreateDeletesTable = Date.now();
           await doQuery(transaction, makeCreateTempTableString(tempTableNameForDeletes, true));
           console.log(`  Created temporary table for deleted hrefs (${tempTableNameForDeletes}) in ${elapsedTimeString(beforeCreateDeletesTable, 'ms')}\t${config.path}`);
 
-          const beforeCreateSafeDeltaSyncTable = new Date();
+          const beforeCreateSafeDeltaSyncTable = Date.now();
           await doQuery(transaction, makeCreateTempTableString(tempTableNameForSafeDeltaSync, true));
           console.log(`  Created temporary table for safe delta sync all hrefs (${tempTableNameForSafeDeltaSync}) in ${elapsedTimeString(beforeCreateSafeDeltaSyncTable, 'ms')}\t${config.path}`);
 
-          const beforeCreateSafeDeltaSyncInsertsTable = new Date();
+          const beforeCreateSafeDeltaSyncInsertsTable = Date.now();
           await doQuery(transaction, makeCreateTempTableString(tempTableNameForSafeDeltaSyncInserts, false));
           console.log(`  Created temporary table for safe delta sync rows to be inserted ((${tempTableNameForSafeDeltaSyncInserts})) in ${elapsedTimeString(beforeCreateSafeDeltaSyncInsertsTable, 'ms')}\t${config.path}`);
         } else if (pg) {
@@ -791,25 +834,25 @@ const dbFactory = function dbFactory(configObject = {}) {
                  LIMIT 0;
               TRUNCATE ${tblName};`;
 
-          const beforeCreateUpdatesTable = new Date();
+          const beforeCreateUpdatesTable = Date.now();
           await doQuery(transaction, makeCreateTempTableString(tempTableNameForUpdates, false));
           console.log(`  Created temporary table for updated rows (${tempTableNameForUpdates}) in ${elapsedTimeString(beforeCreateUpdatesTable, 'ms')}\t${config.path}`);
 
-          const beforeCreateDeletesTable = new Date();
+          const beforeCreateDeletesTable = Date.now();
           await doQuery(transaction, makeCreateTempTableString(tempTableNameForDeletes, true));
           console.log(`  Created temporary table for deleted rows (${tempTableNameForDeletes}) in ${elapsedTimeString(beforeCreateDeletesTable, 'ms')}\t${config.path}`);
 
-          const beforeCreateSafeDeltaSyncTable = new Date();
+          const beforeCreateSafeDeltaSyncTable = Date.now();
           await doQuery(transaction, makeCreateTempTableString(tempTableNameForSafeDeltaSync, true));
           console.log(`  Created temporary table for safe delta sync all rows (${tempTableNameForSafeDeltaSync}) in ${elapsedTimeString(beforeCreateSafeDeltaSyncTable, 'ms')}\t${config.path}`);
 
-          const beforeCreateSafeDeltaSyncInsertsTable = new Date();
+          const beforeCreateSafeDeltaSyncInsertsTable = Date.now();
           await doQuery(transaction, makeCreateTempTableString(tempTableNameForSafeDeltaSyncInserts, false));
           console.log(`  Created temporary table for safe delta sync rows to be inserted (${tempTableNameForSafeDeltaSyncInserts}) in ${elapsedTimeString(beforeCreateSafeDeltaSyncInsertsTable, 'ms')}\t${config.path}`);
         }
       } catch (e) {
         console.log('Creating temp tables failed', e, e.stack);
-        throw new Error('Creating temp tables failed', e);
+        throw new Error('Creating temp tables failed');
       }
     },
     /**
@@ -868,7 +911,7 @@ const dbFactory = function dbFactory(configObject = {}) {
           console.log(`  -> Deleted ${deleteResults.rowsAffected[0]} rows from ${config.writeTable} in ${elapsedTimeString(beforeDelete, 's', deleteResults.rowsAffected[0])}`);
 
           if (fullSync && fullSyncDeletesAll) {
-            console.log(`  -> No updates needed because the full sync deleted all records first`);
+            console.log('  -> No updates needed because the full sync deleted all records first');
           } else {
             const beforeUpdate = Date.now();
             const updateResults = await doQuery(transaction, `UPDATE w
@@ -999,10 +1042,9 @@ const dbFactory = function dbFactory(configObject = {}) {
           console.log(`  -> Deleted ${deleteResults.rowCount} rows from ${config.writeTable} in ${elapsedTimeString(beforeDelete, 's', deleteResults.rowCount)}`);
 
           if (fullSync && fullSyncDeletesAll) {
-            console.log(`  -> No updates needed because the full sync deleted all records first`);
-          }
-          else if (!fullSync && deltaSyncDeletesUpdatedRowsFirst) {
-            console.log(`  -> No updates needed because the delta sync deleted all updated records first`);
+            console.log('  -> No updates needed because the full sync deleted all records first');
+          } else if (!fullSync && deltaSyncDeletesUpdatedRowsFirst) {
+            console.log('  -> No updates needed because the delta sync deleted all updated records first');
           } else {
             const beforeUpdate = Date.now();
             const updateResults = await doQuery(transaction, `UPDATE ${w} w
@@ -1062,7 +1104,7 @@ const dbFactory = function dbFactory(configObject = {}) {
         }
       } catch (e) {
         console.log('copyTempTablesDataToWriteTable failed', e, e.stack);
-        throw new Error('copyTempTablesDataToWriteTable failed', e);
+        throw new Error('copyTempTablesDataToWriteTable failed');
       }
       return 0;
     },
@@ -1183,7 +1225,7 @@ const dbFactory = function dbFactory(configObject = {}) {
         }
       } catch (e) {
         console.log(e.stack);
-        throw new Error('copySafeSyncTempTablesDataToWriteTable failed', e);
+        throw new Error('copySafeSyncTempTablesDataToWriteTable failed');
       }
       return 0;
     },
@@ -1230,7 +1272,7 @@ const dbFactory = function dbFactory(configObject = {}) {
         }
       } catch (e) {
         console.log(e.stack);
-        throw new Error('findSafeSyncMissingHrefs failed', e);
+        throw new Error('findSafeSyncMissingHrefs failed');
       }
       return 0;
     },
@@ -1254,7 +1296,7 @@ const dbFactory = function dbFactory(configObject = {}) {
       } catch (err) {
         console.error('Problem updating rows', err, err.stack);
         if (!transaction) db.rollbackTransaction(myTransaction);
-        throw new Error('Problem updating rows', err);
+        throw new Error('Problem updating rows');
       } finally {
         if (!transaction) await db.commitTransaction(myTransaction);
       }
@@ -1279,7 +1321,7 @@ const dbFactory = function dbFactory(configObject = {}) {
       } catch (err) {
         console.error('Problem updating rows', err, err.stack);
         if (!transaction) db.rollbackTransaction(myTransaction);
-        throw new Error('Problem updating rows', err);
+        throw new Error('Problem updating rows');
       } finally {
         if (!transaction) await db.commitTransaction(myTransaction);
       }
@@ -1298,7 +1340,7 @@ const dbFactory = function dbFactory(configObject = {}) {
       } catch (err) {
         console.error('Problem updating rows', err, err.stack);
         if (!transaction) db.rollbackTransaction(myTransaction);
-        throw new Error('Problem updating rows', err);
+        throw new Error('Problem updating rows');
       } finally {
         if (!transaction) await db.commitTransaction(myTransaction);
       }
@@ -1326,7 +1368,7 @@ const dbFactory = function dbFactory(configObject = {}) {
       } catch (err) {
         console.error('Problem updating rows', err, err.stack);
         if (!transaction) db.rollbackTransaction(myTransaction);
-        throw new Error('Problem updating rows', err);
+        throw new Error('Problem updating rows');
       } finally {
         if (!transaction) await db.commitTransaction(myTransaction);
       }
@@ -1345,6 +1387,23 @@ const dbFactory = function dbFactory(configObject = {}) {
  *********************** */
 
 /**
+ * @typedef { {
+ *  dryRun?: boolean,
+ *  syncMethod?: 'fullSync' | 'deltaSync' |  'safeDeltaSync',
+ *  broadcastUrl?: string,
+ *  broadcastSyncMethod?: 'fullSync' | 'deltaSync' |  'safeDeltaSync',
+ *  db: TDbConfigObject,
+ *  api: {
+ *    baseUrl: string,
+ *    path: string,
+ *    nextLinksBroken?: boolean,
+ *    username?: string,
+ *    password?: string,
+ *    headers: Record<string,string>,
+ *    [key: string]: unknown,
+ *  },
+ * } } TSri2DbConfig
+ *
  * A new version trying to abstract the DB away (to be able to use postgres or mssql)
  * Also written in a more up-to-date way.
  * Also: just a factoryfunction that will return an object containing the right settings
@@ -1360,10 +1419,20 @@ const dbFactory = function dbFactory(configObject = {}) {
  *
  * We have 2 factory functions now: one that creates a simple client, and one that creates
  * multiple clients in order to sync many API's at once with a simplified interface.
+ *
+ * @param {TSri2DbConfig} configObject
  */
-function Sri2DbFactory(configObject = {}) {
+function Sri2DbFactory(configObject) {
   // make a deep clone so the initialization object cannot be tampered with anymore afterwards
-  const config = clonedeep(configObject);
+  /** @type {TSri2DbConfig} */
+  const config = {
+    // set some defaults
+    dryRun: false,
+    nextLinksBroken: false,
+    syncMethod: 'fullSync',
+    broadcastSyncMethod: 'deltaSync',
+    ...clonedeep(configObject),
+  };
 
   if (!config.api) {
     throw new Error('[Sri2Db] invalid config object, config.api object missing');
@@ -1391,15 +1460,14 @@ function Sri2DbFactory(configObject = {}) {
    * The function will not work in parallel, so we wait to call the next one until
    * the current one has finished processing.
    *
-   * @param {*} ayncFunctionToApply the function that will be applied to each 'page'
+   * @param {(apiResults:Array<string | Record<string, unknown>>, lastPage:boolean, pageNum:number, count:number) => Promise<any>} asyncFunctionToApply the function that will be applied to each 'page'
    *  we get from the API (following the next links). Its parameters will be
    *  - an array of api resource objects (or strings containing hrefs if expand=NONE)
    *  - isLastPage boolean indicating no more pages will follow
    *  - current page
    *  - nr of resources handled so far
-   * @param {*} url
-   * // @param {*} queryParams: am I going to support these?
-   * @param {*} options sri-client options
+   * @param {string} url
+   * @param {{wait?: boolean, nextLinksBroken?: boolean }} options sri-client options
    *  - wait: true (= default) means we won't fetch the next urls until ayncFunctionToApply has
    *    resolved, meaning the asyncFunctionToApply never runs in parallel
    *  - nextLinksBroken: true will auto-generate next page url with limit and offset instead of
@@ -1451,18 +1519,20 @@ function Sri2DbFactory(configObject = {}) {
     const basePath = hrefsToFetch[0].substring(0, hrefsToFetch[0].lastIndexOf('/'));
 
     /**
-     *
-     * @param {*} keys
+     * A helper function to generate the next url
+     * @param {*} keysToFetch
      * @param {*} startOffset
-     * @return { url: '<the url to fetch>', nextStartOffset: <offset to give to next call>, count: <nr of keys in url>}
+     * @return { {
+     *  nextPath: string, nextStartOffset: number, count: number
+     * }} count=nr of keys in url
      */
-    function getNextPath(keys, startOffset, limit = 500) {
+    function getNextPath(keysToFetch, startOffset, limit = 500) {
       let url = `${basePath}?limit=${limit}&keyIn=`;
       let i = startOffset;
       let count = 0;
-      for (; url.length < 2048 && i < keys.length && count < limit; i++, count++) {
+      for (; url.length < 2048 && i < keysToFetch.length && count < limit; i++, count++) {
         const addComma = url.lastIndexOf('=') !== url.length - 1;
-        url = url + (addComma ? ',' : '') + keys[i];
+        url = url + (addComma ? ',' : '') + keysToFetch[i];
       }
       if (count === 0) {
         url = null;
@@ -1705,7 +1775,7 @@ function Sri2DbFactory(configObject = {}) {
           // fetch all records from the API that have become a part of the list recently,
           // but not because of a recent update of the resource itself (those would have been
           // found already with modifiedSince)
-          const hrefsToFetch = await db.findSafeSyncMissingHrefs(dbTransaction)
+          const hrefsToFetch = await db.findSafeSyncMissingHrefs(dbTransaction);
           if (hrefsToFetch.length > 0) {
             console.log(`Trying to fetch ${hrefsToFetch.length} resources from API`);
             const beforeFetch = Date.now();
@@ -1816,7 +1886,7 @@ function Sri2DbFactory(configObject = {}) {
     //   syncPromises[paramsAsString][0] = innerSync();
     // }
     if (isSyncRunning()) {
-      return Promise.reject('Another sync is still running.');
+      return Promise.reject(new Error('Another sync is still running.'));
     }
 
     // Finally not supported in NodeJS 8 ?
@@ -1830,7 +1900,7 @@ function Sri2DbFactory(configObject = {}) {
       syncDonePromise.settled = true;
       console.warn('[sync] Error while trying to sync', e, e.stack);
       // throw e;
-      throw new Error('[sync] Error while trying to sync', e);
+      throw new Error('[sync] Error while trying to sync');
     });
 
     return syncDonePromise;
@@ -2000,39 +2070,34 @@ function Sri2DbFactory(configObject = {}) {
  * synced as soon as you call sync.
  * You can also control the level of concurrency between multiple syncs, allowing you
  * to run all syncs one by one or multiple in parallel.
- * @param {*} config STRUCTURE = {
- *    baseConfig: {...},
- *    concurrency: (>=1),
- *    overwrites: [ {
- *      (sparse sri2db config containing only the properties that differ
- *      from the sharedConfig)
- *    }, ... ]
- * }
+ * @param { {
+ *    baseConfig: TSri2DbConfig,
+ *    concurrency: number,
+ *    overwrites: Array<Partial<TSri2DbConfig>> // sparse sri2db config containing only the properties that differ from the baseConfig
+ * } } configObject
  * @return an instance of the client that exposes the methods you can call
  *    the most important is sync(), that returns a promise containing an array of all results
  *    returned from the individual syncs. In case a sync fails, the result will contain the
  *    error, the value of the resolved promise otherwise.
  */
-function Sri2DbMultiFactory(configObject = {}) {
+function Sri2DbMultiFactory(configObject) {
   // make a deep clone so the initialization object cannot be tampered with anymore afterwards
-  const config = clonedeep(configObject);
-  if (!config.concurrency) {
-    config.concurrency = 1;
-  } else if (!Number.isInteger(config.concurrency) || config.concurrency <= 0) {
+  const config = {
+    concurrency: 1,
+    ...clonedeep(configObject),
+  };
+
+  if (!Number.isInteger(config.concurrency) || config.concurrency <= 0) {
     throw new Error('Concurrency must be a postive integer.');
   }
 
   const sri2dbConfigs = config.overwrites.map(ow => jsonmergepatch.apply(clonedeep(config.baseConfig), ow));
   const sri2dbClients = sri2dbConfigs.map(c => Sri2DbFactory(c));
 
-  async function sleep(timeout) {
-    return new Promise((resolve, reject) => setTimeout(() => resolve(true), timeout));
-  }
-
   // you'd want to hand this function's output to pAll
   function allMethods(methodName) {
     const tasks = sri2dbClients.map(
-      c =>
+      c => (
         // console.log('Function generator for', c.config.api.path);
         async () => {
           console.log('[Sri2DMulti] Starting', methodName, 'for', c.config.api.path);
@@ -2040,7 +2105,7 @@ function Sri2DbMultiFactory(configObject = {}) {
           const result = (await pSettle([c[methodName]()]))[0];
           return result;
         }
-      ,
+      ),
     );
     return tasks;
   }
@@ -2056,7 +2121,7 @@ function Sri2DbMultiFactory(configObject = {}) {
 
   Object.keys(sri2dbClients.length > 0 ? sri2dbClients[0] : {})
     .filter(k => sri2dbClients[0][k] instanceof Function)
-    .forEach(k => retVal[k] = (async () => runAllByName(k)));
+    .forEach((k) => { retVal[k] = (async () => runAllByName(k)); });
 
   return retVal;
   // {
