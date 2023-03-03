@@ -23,6 +23,7 @@ const {
   elapsedTimeCalculations,
   elapsedTimeString,
   translateApiResponseToArrayOfResources,
+  convertKeyToString,
 } = require('./utils');
 
 
@@ -90,6 +91,7 @@ const dbs = {};
  *    path?: string, // path of synced api (like /orders)
  *    readTable?: string,
  *    writeTable?: string,
+ *    options?: object,
  * } } TDbConfigObject
  *
  * A helper containing some methods to interact with the database.
@@ -479,8 +481,8 @@ const dbFactory = function dbFactory(dbConfigObject) {
             max: 10,
             min: 0,
             idleTimeoutMillis: config.idleTimeout,
-            connectionTimeout: config.connectionTimeout, // should not be in pool I guess?
           },
+          options: config.options,
           connectionTimeout: config.connectionTimeout,
           requestTimeout: config.queryTimeout,
         };
@@ -1742,7 +1744,8 @@ function Sri2DbFactory(configObject) {
             await db.saveApiResultsToDb(resources, dbTransaction);
           } else {
             // some old API's are missing $$meta.modified or even key
-            const resourcesToStore = resources.map(r => fixResourceForStoring(r));
+            const resourcesToStore = resources.map(r => fixResourceForStoring(r))
+                                              .map(r => convertKeyToString(r));
             await tempTablesInitializededPromise; // make sure temp tables have been created by now
             await db.saveApiResultsToDb(resourcesToStore, dbTransaction);
             lastModified = resourcesToStore.reduce(
@@ -1780,7 +1783,8 @@ function Sri2DbFactory(configObject) {
             console.log(`Trying to fetch ${hrefsToFetch.length} resources from API`);
             const beforeFetch = Date.now();
             const resourcesToStore = (await getAllHrefs(hrefsToFetch, {}, config.api.batchPath))
-              .map(r => fixResourceForStoring(r));
+              .map(r => fixResourceForStoring(r))
+              .map(r => convertKeyToString(r));
 
             console.log(`Fetched ${resourcesToStore.length} resources from API in ${elapsedTimeString(beforeFetch, 'm', resourcesToStore.length, 's')}.`);
             totalCount += await db.saveSafeSyncMissingApiResultsToDb(

@@ -65,6 +65,22 @@ function fixResourceForStoring(r) {
   return retVal;
 }
 
+/**
+ * This function will convert the key of a resource into a string.
+ *
+ * @param {object} r
+ */
+ function convertKeyToString(r) {
+  if (typeof r.key === 'string') {
+    return r;
+  } else if (typeof r.key === 'number') {
+    const retVal = clonedeep(r);
+    retVal.key = r.key.toString();
+    return retVal;
+  } else {
+    throw new Error(`Unxpected key type: ${r.key} - ${typeof r.key}`);
+  }
+}
 
 /**
  * Either adds expand= to the url or replaces the existing expand= with
@@ -178,6 +194,7 @@ module.exports = {
   removeDollarFields,
   hashCode,
   fixResourceForStoring,
+  convertKeyToString,
   setExpandOnPath,
   msToOtherUnit,
   elapsedTimeCalculations,

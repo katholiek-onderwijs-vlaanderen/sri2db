@@ -115,6 +115,9 @@ describe('sri2db test suite', () => {
       ssl: false,
       // table: 'sri2db_large',
       connectionTimeout: 2000,
+      options: {
+        trustServerCertificate: true // tedious config option trustServerCertificate defaults to false if not supplied since mssql 7.x
+      }
     },
     syncMethod: 'fullSync',
   };
@@ -132,10 +135,12 @@ describe('sri2db test suite', () => {
       max: 2,
       min: 0,
       idleTimeoutMillis: singleConfigMssqlBase.db.idleTimeout || 2000,
-      connectionTimeout: singleConfigMssqlBase.db.connectionTimeout, // should not be in pool I guess?
     },
     connectionTimeout: singleConfigMssqlBase.db.connectionTimeout || 2000,
     requestTimeout: singleConfigMssqlBase.db.queryTimeout || 2000,
+    options: {
+      trustServerCertificate: true // tedious config option trustServerCertificate defaults to false if not supplied since mssql 7.x
+    }
   };
 
   let mssqldb;
@@ -215,6 +220,9 @@ describe('sri2db test suite', () => {
         db: {
           ...singleConfigMssqlBase.db,
           table: 'sri2db_large',
+          options: {
+            trustServerCertificate: true // tedious config option trustServerCertificate defaults to false if not supplied since mssql 7.x
+          },
         },
         syncMethod: 'fullSync',
       };
