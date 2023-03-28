@@ -23,7 +23,6 @@ const {
   elapsedTimeCalculations,
   elapsedTimeString,
   translateApiResponseToArrayOfResources,
-  convertKeyToString,
 } = require('./utils');
 
 
@@ -264,7 +263,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
             if (baseUrlColumnExists) addParams.push(config.baseUrl);
             if (pathColumnExists) addParams.push(config.path);
 
-            addParams.push(r.key);
+            addParams.push(r.key.toString());
             addParams.push(new Date(r.$$meta.modified));
             addParams.push(JSON.stringify(r));
             if (resourceTypeColumnExists) addParams.push(r.$$meta.type);
@@ -1744,8 +1743,7 @@ function Sri2DbFactory(configObject) {
             await db.saveApiResultsToDb(resources, dbTransaction);
           } else {
             // some old API's are missing $$meta.modified or even key
-            const resourcesToStore = resources.map(r => fixResourceForStoring(r))
-                                              .map(r => convertKeyToString(r));
+            const resourcesToStore = resources.map(r => fixResourceForStoring(r));
             await tempTablesInitializededPromise; // make sure temp tables have been created by now
             await db.saveApiResultsToDb(resourcesToStore, dbTransaction);
             lastModified = resourcesToStore.reduce(
@@ -1783,8 +1781,7 @@ function Sri2DbFactory(configObject) {
             console.log(`Trying to fetch ${hrefsToFetch.length} resources from API`);
             const beforeFetch = Date.now();
             const resourcesToStore = (await getAllHrefs(hrefsToFetch, {}, config.api.batchPath))
-              .map(r => fixResourceForStoring(r))
-              .map(r => convertKeyToString(r));
+              .map(r => fixResourceForStoring(r));
 
             console.log(`Fetched ${resourcesToStore.length} resources from API in ${elapsedTimeString(beforeFetch, 'm', resourcesToStore.length, 's')}.`);
             totalCount += await db.saveSafeSyncMissingApiResultsToDb(
