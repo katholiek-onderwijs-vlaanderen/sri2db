@@ -1978,7 +1978,9 @@ function Sri2DbFactory(configObject) {
     }
 
     if (!socket || socket.disconnected) {
-      socket = config.broadcastSocketIoVersion === '2' ? ioV2.connect(config.broadcastUrl) : io.connect(config.broadcastUrl);
+      socket = config.broadcastSocketIoVersion === '4'
+        ? io.connect(config.broadcastUrl)
+        : ioV2.connect(config.broadcastUrl);
 
       retryConnectInterval = setInterval(() => {
         if (!socket || socket.disconnected) {
