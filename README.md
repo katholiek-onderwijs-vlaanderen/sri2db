@@ -68,6 +68,7 @@ const sri2dbConfig = {
     syncMethod: 'fullSync' | 'deltaSync' | 'safeDeltaSync', // to define the sync that will be executed when calling client.configuredSync()
     dryRun: false, // true would rollback transactions to simply check if it all works
     broadcastUrl: 'https://some-broadcast-api.herokuapp.com/', // if you want to trigger delta syncs based on live updates via socket.io
+    broadcastSocketIoVersion: '4', // default = '2', but if you need to use a newer socket.io client version it can also be set it to '4'
     broadcastSyncMethod: 'deltaSync', //deltaSync by default, but if you want to trigger another sync method for example a safeDeltaSync when a resource gets updated, you can configure it here
     api: {
         baseUrl: 'https://api.my.org',

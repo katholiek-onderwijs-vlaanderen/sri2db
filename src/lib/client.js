@@ -9,6 +9,7 @@
 const util = require('util');
 const clonedeep = require('lodash.clonedeep');
 const io = require('socket.io-client');
+const ioV2 = require('socket.io-client.v2');
 const sriClientFactory = require('@kathondvla/sri-client/node-fetch'); // node-sri-client
 const SriClientError = require('@kathondvla/sri-client/sri-client-error');
 const pAll = require('p-all');
@@ -1392,6 +1393,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
  *  dryRun?: boolean,
  *  syncMethod?: 'fullSync' | 'deltaSync' |  'safeDeltaSync',
  *  broadcastUrl?: string,
+ *  broadcastSocketIoVersion?: '2' | '4',
  *  broadcastSyncMethod?: 'fullSync' | 'deltaSync' |  'safeDeltaSync',
  *  db: TDbConfigObject,
  *  api: {
@@ -1976,7 +1978,7 @@ function Sri2DbFactory(configObject) {
     }
 
     if (!socket || socket.disconnected) {
-      socket = io.connect(config.broadcastUrl);
+      socket = config.broadcastSocketIoVersion === '2' ? ioV2.connect(config.broadcastUrl) : io.connect(config.broadcastUrl);
 
       retryConnectInterval = setInterval(() => {
         if (!socket || socket.disconnected) {
