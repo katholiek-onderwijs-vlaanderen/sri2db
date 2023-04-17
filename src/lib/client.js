@@ -9,6 +9,7 @@
 const util = require('util');
 const clonedeep = require('lodash.clonedeep');
 const io = require('socket.io-client');
+const ioV2 = require('socket.io-client.v2');
 const sriClientFactory = require('@kathondvla/sri-client/node-fetch'); // node-sri-client
 const SriClientError = require('@kathondvla/sri-client/sri-client-error');
 const pAll = require('p-all');
@@ -90,6 +91,7 @@ const dbs = {};
  *    path?: string, // path of synced api (like /orders)
  *    readTable?: string,
  *    writeTable?: string,
+ *    options?: object,
  * } } TDbConfigObject
  *
  * A helper containing some methods to interact with the database.
@@ -262,7 +264,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
             if (baseUrlColumnExists) addParams.push(config.baseUrl);
             if (pathColumnExists) addParams.push(config.path);
 
-            addParams.push(r.key);
+            addParams.push(r.key.toString());
             addParams.push(new Date(r.$$meta.modified));
             addParams.push(JSON.stringify(r));
             if (resourceTypeColumnExists) addParams.push(r.$$meta.type);
@@ -479,8 +481,8 @@ const dbFactory = function dbFactory(dbConfigObject) {
             max: 10,
             min: 0,
             idleTimeoutMillis: config.idleTimeout,
-            connectionTimeout: config.connectionTimeout, // should not be in pool I guess?
           },
+          options: config.options,
           connectionTimeout: config.connectionTimeout,
           requestTimeout: config.queryTimeout,
         };
@@ -1391,6 +1393,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
  *  dryRun?: boolean,
  *  syncMethod?: 'fullSync' | 'deltaSync' |  'safeDeltaSync',
  *  broadcastUrl?: string,
+ *  broadcastSocketIoVersion?: '2' | '4',
  *  broadcastSyncMethod?: 'fullSync' | 'deltaSync' |  'safeDeltaSync',
  *  db: TDbConfigObject,
  *  api: {
@@ -1975,7 +1978,9 @@ function Sri2DbFactory(configObject) {
     }
 
     if (!socket || socket.disconnected) {
-      socket = io.connect(config.broadcastUrl);
+      socket = config.broadcastSocketIoVersion === '4'
+        ? io.connect(config.broadcastUrl)
+        : ioV2.connect(config.broadcastUrl);
 
       retryConnectInterval = setInterval(() => {
         if (!socket || socket.disconnected) {

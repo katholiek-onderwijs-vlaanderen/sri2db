@@ -65,7 +65,6 @@ function fixResourceForStoring(r) {
   return retVal;
 }
 
-
 /**
  * Either adds expand= to the url or replaces the existing expand= with
  * the given expansion
