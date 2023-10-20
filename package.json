@@ -27,7 +27,7 @@
     "mssql": "^9.1.1",
     "p-all": "2.1.0",
     "p-settle": "3.1.0",
-    "pg-promise": "^10.15.4",
+    "pg-promise": "^11.4.3",
     "socket.io-client": "^4.5.4",
     "socket.io-client.v2": "npm:socket.io-client@^2.5.0"
   },
