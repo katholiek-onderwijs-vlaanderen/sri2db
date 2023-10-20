@@ -534,7 +534,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
     if (!initialized) {
       const tableColumns = await getTableColumns(transaction, config.writeTable);
       const tableColumnNames = tableColumns.map(c => c.column_name);
-      columnsForUpserts = mssql ? `[${tableColumnNames.join('],[')}]` : tableColumnNames.join();
+      columnsForUpserts = mssql ? `[${tableColumnNames.join('],[')}]` : `"${tableColumnNames.join('","')}"`;
       console.log('TableColumns', columnsForUpserts);
       resourceTypeColumnExists = !!tableColumns.find(e => e.column_name.toLowerCase() === 'resourcetype');
       baseUrlColumnExists = !!tableColumns.find(e => e.column_name.toLowerCase() === 'baseurl');
@@ -543,7 +543,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
       const tableColumnNamesForDeletes = ['href'];
       if (baseUrlColumnExists) tableColumnNamesForDeletes.push('baseurl');
       if (pathColumnExists) tableColumnNamesForDeletes.push('path');
-      columnsForDeletes = mssql ? `[${tableColumnNamesForDeletes.join('],[')}]` : tableColumnNamesForDeletes.join();
+      columnsForDeletes = mssql ? `[${tableColumnNamesForDeletes.join('],[')}]` : `"${tableColumnNamesForDeletes.join('","')}"`;
 
 
       const createLastSyncTimesTableResults = await createLastSyncTimesTableIfNecessary(transaction);
