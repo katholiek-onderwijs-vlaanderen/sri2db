@@ -567,8 +567,11 @@ const dbFactory = function dbFactory(dbConfigObject) {
     if (mssql && transaction) {
       return transaction.commit();
     } if (pg && transaction) {
-      await transaction.none('COMMIT');
-      await transaction.done();
+      try {
+        await transaction.none('COMMIT');
+      } finally {
+        await transaction.done();
+      }
       // poolOrConnection = null;
       return true;
     }
@@ -583,8 +586,11 @@ const dbFactory = function dbFactory(dbConfigObject) {
       return transaction.rollback();
     }
     if (pg) {
-      await transaction.none('ROLLBACK');
-      await transaction.done();
+      try {
+        await transaction.none('ROLLBACK');
+      } finally {
+        await transaction.done();
+      }
       return true;
     }
     return 0;
