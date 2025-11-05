@@ -1586,8 +1586,10 @@ function Sri2DbFactory(configObject) {
 
     const keys = hrefsToFetch.map(h => {
       const url = new URL(h);
+      console.log(`[getAllHrefs] key for href ${h} is ${url.pathname}`);
       return url.pathname;
     });
+    console.log(`[getAllHrefs] Getting all hrefs, total of ${keys.length} to fetch`);
     const basePath = hrefsToFetch[0].substring(0, hrefsToFetch[0].lastIndexOf('/'));
 
     /**
@@ -1600,6 +1602,7 @@ function Sri2DbFactory(configObject) {
      */
     function getNextPath(keysToFetch, startOffset, limit = 500) {
       let url = `${basePath}?limit=${limit}&hrefs=`;
+      console.log(`[getAllHrefs] Generating next path starting from offset ${startOffset}`);
       let i = startOffset;
       let count = 0;
       for (; url.length < 2048 && i < keysToFetch.length && count < limit; i++, count++) {
