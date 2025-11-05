@@ -1584,7 +1584,10 @@ function Sri2DbFactory(configObject) {
   async function getAllHrefs(hrefsToFetch, options = {}, batchPath = null) {
     if (hrefsToFetch.length === 0) return [];
 
-    const keys = hrefsToFetch.map(h => h.substring(h.lastIndexOf('/') + 1));
+    const keys = hrefsToFetch.map(h => {
+      const url = new URL(h);
+      return url.pathname;
+    });
     const basePath = hrefsToFetch[0].substring(0, hrefsToFetch[0].lastIndexOf('/'));
 
     /**
@@ -1596,7 +1599,7 @@ function Sri2DbFactory(configObject) {
      * }} count=nr of keys in url
      */
     function getNextPath(keysToFetch, startOffset, limit = 500) {
-      let url = `${basePath}?limit=${limit}&keyIn=`;
+      let url = `${basePath}?limit=${limit}&hrefs=`;
       let i = startOffset;
       let count = 0;
       for (; url.length < 2048 && i < keysToFetch.length && count < limit; i++, count++) {
