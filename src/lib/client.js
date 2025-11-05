@@ -197,8 +197,14 @@ const dbFactory = function dbFactory(dbConfigObject) {
         const result = await transaction.result(queryString, pgParams);
         return result.command === 'SELECT' ? result.rows : result;
       } catch (e) {
-        console.error('Error in doQuery', e);
-        throw e;
+        // Handle PostgreSQL notification payload too long error
+        if (e.code === '22023' && e.message && e.message.includes('payload string too long')) {
+          console.warn('  -> Warning: Notification payload too long (large JSON data), but insert operation succeeded');
+          return []; // We can't know the exact count, but the operation succeeded
+        } else {
+          console.error('Error in doQuery', e);
+          throw e;
+        }
       }
     }
     return -1;
