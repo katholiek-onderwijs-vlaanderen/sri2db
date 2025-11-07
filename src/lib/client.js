@@ -199,12 +199,14 @@ const dbFactory = function dbFactory(dbConfigObject) {
       } catch (e) {
         // Handle PostgreSQL notification payload too long error
         if (e.code === '22023' && e.message && e.message.includes('payload string too long')) {
+          // Only suppress if we can verify the insert actually succeeded
+          // For now, log and re-throw to see the full context
           console.warn('  -> Warning: Notification payload too long (large JSON data), but insert operation succeeded');
-          return []; // We can't know the exact count, but the operation succeeded
-        } else {
-          console.error('Error in doQuery', e);
-          throw e;
         }
+        console.error('Error in doQuery', e);
+        console.error('Query that failed:', queryString);
+        console.error('Params:', params);
+        throw e;
       }
     }
     return -1;
@@ -1118,6 +1120,10 @@ const dbFactory = function dbFactory(dbConfigObject) {
         }
       } catch (e) {
         console.log('copyTempTablesDataToWriteTable failed', e, e.stack);
+        // If transaction is aborted, no need to explicitly rollback
+        if (e.code === '25P02' || (e.message && e.message.includes('transaction is aborted'))) {
+          console.log('Transaction was aborted, explicit rollback not needed but propagating error');
+        }
         throw new Error('copyTempTablesDataToWriteTable failed');
       }
       return 0;
