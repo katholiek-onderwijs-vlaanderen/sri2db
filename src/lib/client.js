@@ -9,7 +9,6 @@
 const util = require('util');
 const clonedeep = require('lodash.clonedeep');
 const io = require('socket.io-client');
-const ioV2 = require('socket.io-client.v2');
 const sriClientFactory = require('@kathondvla/sri-client/node-fetch'); // node-sri-client
 const SriClientError = require('@kathondvla/sri-client/sri-client-error');
 const pAll = require('p-all');
@@ -17,7 +16,6 @@ const pSettle = require('p-settle');
 const jsonmergepatch = require('json-merge-patch');
 
 const {
-  removeDollarFields,
   hashCode,
   fixResourceForStoring,
   setExpandOnPath,
@@ -26,51 +24,8 @@ const {
   translateApiResponseToArrayOfResources,
 } = require('./utils');
 
-
-/**
- * It will add the proper input parameters to the request object, and return the '... IN (...)'
- * part of the query string (IN over multiple columns is not supported in MSSQL)
- *
- * @param request sql request object
- * @param {string} columnName sql table column name
- * @param {string} parameterNamePrefix prefix for parameter name
- * @param type parameter type
- * @param {Array<string>} values an array of values
- *
- * @return the 'column IN ( @p1, @pé, ... )' part of the query
- */
-function mssqlParameterizeQueryForIn(request, columnName, parameterNamePrefix, type, values) {
-  const parameterNames = values.map((v, i) => `${parameterNamePrefix}${i}`);
-  values.forEach((v, i) => request.input(parameterNames[i], type, v));
-  return `[${columnName}] IN (${parameterNames.map(n => `@${n}`).join(',')})`;
-}
-
-
-/**
- * It will add the proper input parameters to the request object, and return the
- * 'VALUES (...),(...),...' part of the query string
- *
- * @param request sql request object
- * @param {Array<string>} columnNames sql table column name
- * @param {string} parameterNamePrefix prefix for parameter name
- * @param {*} types parameter type
- * @param {Array<Array<string>>} tuples an array of arrays of values (all the tuples to be inserted)
- *
- * @return the 'column IN ( @p1, @pé, ... )' part of the query
- */
-function mssqlParameterizeQueryForInsertValues(request, columnNames, parameterNamePrefix, types, tuples) {
-  const parameterNames = tuples.map(
-    (tuple, i) => tuple.map((value, j) => `${parameterNamePrefix}_${i}_${j}`),
-  );
-  tuples.forEach(
-    (tuple, i) => tuple.forEach((value, j) => request.input(parameterNames[i][j], types[j], value)),
-  );
-  return `(${columnNames.map(c => `[${c}]`).join(',')}) VALUES ${parameterNames
-    .map(tuple => `(${tuple.map(n => `@${n}`).join(',')})`)
-    .join(',')}`;
-}
-
 const dbs = {};
+
 /**
  * @typedef { {
  *    type: 'pg' | 'postgres' | 'postgresql'| 'mssql',
@@ -1399,7 +1354,6 @@ const dbFactory = function dbFactory(dbConfigObject) {
  *  dryRun?: boolean,
  *  syncMethod?: 'fullSync' | 'deltaSync' |  'safeDeltaSync',
  *  broadcastUrl?: string,
- *  broadcastSocketIoVersion?: '2' | '4',
  *  broadcastSyncMethod?: 'fullSync' | 'deltaSync' |  'safeDeltaSync',
  *  db: TDbConfigObject,
  *  api: {
@@ -1963,16 +1917,8 @@ function Sri2DbFactory(configObject) {
 
 
   let socket = null;
-  let retryConnectInterval;
   let retryBroadcastTriggeredSyncInterval;
 
-  const uninstallBroadCastListeners = function uninstallBroadCastListeners() {
-    if (socket) {
-      socket.close();
-      socket = null;
-      clearInterval(retryConnectInterval);
-    }
-  };
 
   /**
    * Utility function, should/can only set up a websocket if the config tells you
@@ -1983,41 +1929,52 @@ function Sri2DbFactory(configObject) {
       return null;
     }
 
-    if (!socket || socket.disconnected) {
-      socket = config.broadcastSocketIoVersion === '4'
-        ? io.connect(config.broadcastUrl)
-        : ioV2.connect(config.broadcastUrl);
+    // Add auth headers only if accessToken exists
+    const connectionOptions = {
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionDelay: 5000,
+      reconnectionDelayMax: 30000,
+      reconnectionAttempts: Infinity, // Keep trying
+      timeout: 20000,
+    };
+    if (configObject.api.headers) {
+      connectionOptions.transportOptions = {
+        websocket: {
+          extraHeaders: configObject.api.headers,
+        },
+      };
+    }
 
-      retryConnectInterval = setInterval(() => {
-        if (!socket || socket.disconnected) {
-          console.log('Socket not connected, retry to setup the connection', config.broadcastUrl, config.api.path);
-          uninstallBroadCastListeners();
-          installBroadCastListeners();
-        }
-      }, 5000);
+    console.log('Trying to set up socket connection to audit/broadcast with url', config.broadcastUrl, 'and path', config.api.path);
+    console.log('Connection options:', connectionOptions);
+
+    if (!socket || socket.disconnected) {
+      socket = io.connect(config.broadcastUrl, connectionOptions);
 
       socket.on('connect', async () => {
         console.log('CONNECTED to audit/broadcast, listening for updates...');
-
-        // stop trying to connect
-        clearInterval(retryConnectInterval);
-
         socket.emit('join', config.api.path.split('?')[0]);
+      });
+
+      socket.on('reconnect', () => {
+        // re-join the room after reconnect, since socket.io handles the reconnect itself
+        console.log('RECONNECTED to audit/broadcast, re-joining...');
+        socket.emit('join', config.api.path.split('?')[0]);
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('Socket connection error to audit/broadcast:', err.message);
+        // retryConnectInterval will keep retrying, no extra action needed here
+      });
+
+      socket.on('error', (err) => {
+        console.error('Socket error from audit/broadcast:', err);
       });
 
       socket.on('disconnect', () => {
         console.log('DISCONNECTED from audit/broadcast, trying to reconnect');
-
-        // simple version reconnects when signalled the connection is gone
-        uninstallBroadCastListeners();
-        installBroadCastListeners();
-
-        // ALTERNATIVE: retry strategy to set up the connection again?
-        // retryConnectInterval = setInterval(10000, () => {
-        //   if (!socket.isSocketConnected()) {
-        //     installBroadCastListeners();
-        //   }
-        // });
+        // let socket.io reconnect automatically
       });
 
       socket.on('update', async (data) => {
@@ -2047,12 +2004,6 @@ function Sri2DbFactory(configObject) {
   };
 
 
-  const isSocketConnected = () => socket != null;
-
-  const close = function close() {
-    uninstallBroadCastListeners();
-    // close db connections etc?
-  };
 
 
 
@@ -2066,9 +2017,6 @@ function Sri2DbFactory(configObject) {
     configuredSync,
     isSyncRunning,
     installBroadCastListeners,
-    uninstallBroadCastListeners,
-    isSocketConnected,
-    close,
     config,
   };
 }
