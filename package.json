@@ -15,7 +15,7 @@
     "eslint": "5.16.0",
     "eslint-config-airbnb-base": "13.1.0",
     "eslint-plugin-import": "2.17.3",
-    "express": "^4.18.2",
+    "express": "^4.21.1",
     "kov-docker-utils": "git+https://github.com/katholiek-onderwijs-vlaanderen/kov-docker-utils.git",
     "mocha": "^10.2.0"
   },
