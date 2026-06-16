@@ -4,3 +4,4 @@ sri2db_test_mssql.Dockerfile
 sri2db_test_mssql.docker-compose.yml
 sri2db_test_postgres.Dockerfile
 sri2db_test_postgres.docker-compose.yml
+config
