@@ -20,7 +20,7 @@
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@kathondvla/sri-client": "git+https://github.com/katholiek-onderwijs-vlaanderen/sri-client.git#3.0.21",
+    "@kathondvla/sri-client": "git+https://github.com/katholiek-onderwijs-vlaanderen/sri-client.git#5b47bb507898404a771621f6e05b1eb2f7d131d4",
     "commander": "4.1.0",
     "json-merge-patch": "0.2.3",
     "lodash.clonedeep": "4.5.0",
