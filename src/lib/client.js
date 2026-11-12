@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-/* eslint-disable max-len */
 /**
 * Created by pablo in 2015
 * Modified by johannes in 2018-2019
@@ -74,9 +72,7 @@ const dbFactory = function dbFactory(dbConfigObject) {
     ...clonedeep(dbConfigObject),
   };
 
-  // eslint-disable-next-line global-require
   const mssql = ['mssql'].includes(config.type.toLowerCase()) ? require('mssql') : null;
-  // eslint-disable-next-line global-require
   const pg = ['pg', 'postgres', 'postgresql'].includes(config.type.toLowerCase()) ? require('pg-promise')({ capSQL: true }) : null;
   if (!mssql && !pg) {
     throw new Error('Configuration problem, dbconfig.type must be either mssql or pg');
@@ -271,7 +267,6 @@ const dbFactory = function dbFactory(dbConfigObject) {
           if (pathColumnExists) value.path = config.path;
 
           return value;
-        // eslint-disable-next-line no-else-return
         } else {
           let value = null;
           if (typeof r === 'string') {
@@ -339,7 +334,6 @@ const dbFactory = function dbFactory(dbConfigObject) {
           { name: 'tableName', type: mssql.VarChar, value: tableName },
         ],
       );
-      // eslint-disable-next-line no-else-return
     } else {
       return doQuery(dbTransaction, `
         SELECT
@@ -1446,7 +1440,6 @@ function Sri2DbFactory(configObject) {
     let count = 0;
     while (nextJsonDataPromise) {
       console.log(`Trying to get ${nextPath}`);
-      // eslint-disable-next-line no-await-in-loop
       const jsonData = await nextJsonDataPromise;
       nextOffset += limit;
       if (jsonData.$$meta && jsonData.$$meta.next) {
@@ -1462,7 +1455,6 @@ function Sri2DbFactory(configObject) {
       // apply async function to batch
       try {
         const jsonDataTranslated = translateApiResponseToArrayOfResources(jsonData);
-        // eslint-disable-next-line no-await-in-loop
         await asyncFunctionToApply(jsonDataTranslated, nextJsonDataPromise === null, pageNum, count);
         count += jsonDataTranslated.length;
       } catch (e) {
@@ -1512,7 +1504,6 @@ function Sri2DbFactory(configObject) {
     const retVal = [];
     while (nextJsonDataPromise) {
       console.log(`[getAllHrefs] Trying to get ${count} hrefs starting from ${currentStartOffset}`);
-      // eslint-disable-next-line no-await-in-loop
       const jsonData = await nextJsonDataPromise;
       const { nextPath: np, nextStartOffset: nso, count: c } = getNextPath(keys, nextStartOffset);
       currentStartOffset = nextStartOffset;
