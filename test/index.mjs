@@ -77,7 +77,6 @@ function fakeApiHandler(req, resp, _next) {
 }
 
 
-// eslint-disable-next-line no-undef
 describe('sri2db test suite', () => {
   const apiConfigBase = {
     baseUrl: 'http://localhost:22222',
@@ -147,7 +146,6 @@ describe('sri2db test suite', () => {
 
   // let connection;
 
-  // eslint-disable-next-line no-undef
   before(async () => {
     const fakeApi = express();
     fakeApi.use(fakeApiHandler);
@@ -157,7 +155,6 @@ describe('sri2db test suite', () => {
     mssqldb = await mssql.connect(mssqlconfig);
   });
 
-  // eslint-disable-next-line no-undef
   after(async () => {
     console.log('closing the fake Api server');
     fakeApiServer.close();

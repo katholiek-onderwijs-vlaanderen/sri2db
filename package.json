@@ -13,11 +13,12 @@
     "chai": "~3.2.0",
     "chai-datetime": "1.4.x",
     "eslint": "^8.57.1",
-    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "express": "^4.18.2",
     "kov-docker-utils": "git+https://github.com/katholiek-onderwijs-vlaanderen/kov-docker-utils.git",
-    "mocha": "^12.0.3"
+    "mocha": "^12.0.3",
+    "prettier": "^3.10.1"
   },
   "overrides": {
     "glob": "^14.0.2",
