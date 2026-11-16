@@ -1,4 +1,3 @@
-/* eslint-disable max-len */
 /** **********************
  *   HELPER FUNCTIONS    *
  *********************** */
@@ -14,7 +13,6 @@ const clonedeep = require('lodash.clonedeep');
 const removeDollarFields = (obj) => {
   Object.keys(obj).forEach((property) => {
     if (property.startsWith('$$') && property !== '$$meta') {
-      // eslint-disable-next-line no-param-reassign
       delete obj[property];
     } else if (obj[property] !== null && typeof obj[property] === 'object') {
       // @ts-ignore
@@ -35,7 +33,6 @@ function hashCode(theString) {
   for (let i = 0; i < theString.length; i++) {
     chr = theString.charCodeAt(i);
     hash = ((hash << 5) - hash) + chr;
-    // eslint-disable-next-line no-bitwise
     hash |= 0; // Convert to 32bit integer
   }
   return hash;
@@ -107,7 +104,6 @@ const msToOtherUnit = (milliseconds, unit) => {
  * @returns {{ unit: string, amount, avgUnit, startDate, endDate }}
  */
 const elapsedTimeCalculations = (startDate, unit = 'ms', amount = false, avgUnit = false, endDate = Date.now()) => {
-  // eslint-disable-next-line no-param-reassign
   if (!avgUnit) avgUnit = unit;
   const retVal = {
     unit, amount, avgUnit, startDate, endDate,
